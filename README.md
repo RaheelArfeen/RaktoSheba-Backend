@@ -4,6 +4,11 @@ A backend-only REST API for a **Blood Donation & Emergency Platform** — hospit
 
 Built for Apollo Level 2 Batch 7, Assignment 6.
 
+## Live deployment
+
+- **API**: https://raktosheba-backend.vercel.app
+- **Interactive docs**: https://raktosheba-backend.vercel.app/api/v1/docs
+
 ## Tech stack
 
 | Layer | Technology |
