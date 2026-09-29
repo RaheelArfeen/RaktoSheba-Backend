@@ -11,6 +11,16 @@ type TInitiatePaymentPayload = {
   requestId?: string;
 };
 
+// Stripe sends the payer back to the frontend's /payment/success and /payment/cancel
+// pages. If those aren't configured, fall back to this API's own simple pages rather
+// than handing Stripe a broken "undefined?paymentId=..." URL.
+const redirectUrl = (envValue: string | undefined, fallbackPath: string, paymentId: string) => {
+  const base = envValue || `http://localhost:${process.env.PORT || 8000}/api/v1/payments/${fallbackPath}`;
+  const url = new URL(base);
+  url.searchParams.set('paymentId', paymentId);
+  return url.toString();
+};
+
 const initiatePayment = async (userId: string, payload: TInitiatePaymentPayload) => {
   if (payload.requestId) {
     const request = await prisma.bloodRequest.findFirst({
@@ -51,8 +61,8 @@ const initiatePayment = async (userId: string, payload: TInitiatePaymentPayload)
       },
     ],
     metadata: { paymentId: payment.id },
-    success_url: `${process.env.CLIENT_SUCCESS_URL}?paymentId=${payment.id}`,
-    cancel_url: `${process.env.CLIENT_CANCEL_URL}?paymentId=${payment.id}`,
+    success_url: redirectUrl(process.env.CLIENT_SUCCESS_URL, 'success', payment.id),
+    cancel_url: redirectUrl(process.env.CLIENT_CANCEL_URL, 'cancel', payment.id),
   });
 
   const updated = await prisma.payment.update({

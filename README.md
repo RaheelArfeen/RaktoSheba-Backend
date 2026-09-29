@@ -82,7 +82,7 @@ The API runs at `http://localhost:8000` by default (`/api/v1/...`).
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` | Google OAuth credentials |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Outbound email (notifications) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe payments |
-| `CLIENT_SUCCESS_URL`, `CLIENT_CANCEL_URL` | Stripe Checkout redirect targets |
+| `CLIENT_SUCCESS_URL`, `CLIENT_CANCEL_URL` | Frontend pages Stripe Checkout returns to (e.g. `http://localhost:3000/payment/success`); `?paymentId=` is appended |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | File uploads |
 
 SMTP and Stripe webhook secrets are optional in development — the mailer logs and no-ops without SMTP credentials, and the webhook route reports a clear error without a signing secret, rather than crashing.
