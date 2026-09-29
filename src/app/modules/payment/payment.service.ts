@@ -1,4 +1,4 @@
-import { PaymentStatus, Role } from '@prisma/client';
+import { Payment, PaymentStatus, Role } from '@prisma/client';
 import Stripe from 'stripe';
 import stripe from '../../../config/stripe';
 import prisma from '../../../config/prisma';
@@ -116,6 +116,27 @@ const handleWebhookEvent = async (rawBody: Buffer, signature: string) => {
   return { received: true };
 };
 
+// The webhook is the source of truth, but it can't reach a local dev machine and can
+// arrive after the payer lands on the success page. For a still-pending payment, ask
+// Stripe directly. If Stripe is unreachable, keep the stored status.
+const syncPendingWithStripe = async (payment: Payment): Promise<Payment> => {
+  if (payment.status !== PaymentStatus.PENDING || !payment.gatewayRef) return payment;
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(payment.gatewayRef);
+    const status =
+      session.payment_status === 'paid'
+        ? PaymentStatus.PAID
+        : session.status === 'expired'
+          ? PaymentStatus.FAILED
+          : null;
+
+    return status ? prisma.payment.update({ where: { id: payment.id }, data: { status } }) : payment;
+  } catch {
+    return payment;
+  }
+};
+
 const getPaymentById = async (id: string, userId: string, role: Role) => {
   const payment = await prisma.payment.findUnique({ where: { id } });
 
@@ -127,7 +148,7 @@ const getPaymentById = async (id: string, userId: string, role: Role) => {
     throw new AppError(403, 'You can only view your own payments');
   }
 
-  return payment;
+  return syncPendingWithStripe(payment);
 };
 
 const listMyPayments = async (userId: string, query: TPaginationParams) => {
