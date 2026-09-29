@@ -759,6 +759,27 @@ export const openApiSpec = {
         },
       },
     },
+    '/requests/{id}/fulfill': {
+      patch: {
+        tags: ['Blood Requests'],
+        summary: 'Mark a matched request as fulfilled (requesting Hospital or Admin only)',
+        description:
+          'Completes the donation and sets the donor\'s lastDonationAt, which starts their 90-day eligibility window.',
+        security: bearerAuth,
+        parameters: [idParam('id', 'Blood request id')],
+        responses: {
+          '200': jsonResponse(
+            'Fulfilled',
+            Envelope(
+              { ...bloodRequestExample, status: 'FULFILLED', donation: { ...donationExample, status: 'COMPLETED' } },
+              'Blood request fulfilled successfully',
+            ),
+          ),
+          '400': errorResponse('Not matched', 'Only matched requests can be fulfilled (current status: VERIFIED)'),
+          '403': errorResponse('Not owner', 'You can only fulfill your own requests'),
+        },
+      },
+    },
     '/notifications/me': {
       get: {
         tags: ['Notifications'],

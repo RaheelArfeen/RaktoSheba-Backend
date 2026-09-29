@@ -26,4 +26,6 @@ router.patch('/:id/cancel', auth(), BloodRequestController.cancelRequest);
 
 router.post('/:id/accept', auth(Role.DONOR), BloodRequestController.acceptRequest);
 
+router.patch('/:id/fulfill', auth(Role.HOSPITAL, Role.ADMIN), BloodRequestController.fulfillRequest);
+
 export const BloodRequestRoutes = router;

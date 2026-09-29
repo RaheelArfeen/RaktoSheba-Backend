@@ -89,6 +89,17 @@ const acceptRequest = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const fulfillRequest = catchAsync(async (req: Request, res: Response) => {
+  const isAdmin = req.user!.role === Role.ADMIN;
+  const result = await BloodRequestService.fulfillRequest(req.user!.userId, req.params.id as string, isAdmin);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Blood request fulfilled successfully',
+    data: result,
+  });
+});
+
 export const BloodRequestController = {
   createRequest,
   getRequestById,
@@ -97,4 +108,5 @@ export const BloodRequestController = {
   cancelRequest,
   getMatches,
   acceptRequest,
+  fulfillRequest,
 };

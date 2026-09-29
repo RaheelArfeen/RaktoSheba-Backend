@@ -1,4 +1,4 @@
-import { BloodGroup, Prisma, RequestStatus } from '@prisma/client';
+import { BloodGroup, DonationStatus, Prisma, RequestStatus } from '@prisma/client';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
 import { isEligibleByLastDonation } from '../donor/donor.constant';
@@ -192,6 +192,52 @@ const acceptRequest = async (requestId: string, donorUserId: string) => {
   }
 };
 
+// Hospital confirms the matched donor gave blood. The request, the donation and the
+// donor's last-donation date (which drives the 90-day rule) change together.
+const fulfillRequest = async (actorId: string, id: string, isAdmin: boolean) => {
+  const request = await prisma.bloodRequest.findFirst({
+    where: { id, deletedAt: null },
+    include: { donation: true },
+  });
+
+  if (!request) {
+    throw new AppError(404, 'Blood request not found');
+  }
+
+  if (!isAdmin && request.requesterId !== actorId) {
+    throw new AppError(403, 'You can only fulfill your own requests');
+  }
+
+  if (request.status !== RequestStatus.MATCHED || !request.donation) {
+    throw new AppError(400, `Only matched requests can be fulfilled (current status: ${request.status})`);
+  }
+
+  const donation = request.donation;
+  const completedAt = new Date();
+
+  const fulfilled = await prisma.$transaction(async (tx) => {
+    await tx.donation.update({
+      where: { id: donation.id },
+      data: { status: DonationStatus.COMPLETED, completedAt },
+    });
+
+    await tx.donorProfile.update({
+      where: { id: donation.donorId },
+      data: { lastDonationAt: completedAt },
+    });
+
+    return tx.bloodRequest.update({
+      where: { id },
+      data: { status: RequestStatus.FULFILLED },
+      include: { donation: true },
+    });
+  });
+
+  await AuditLogService.log(actorId, 'FULFILL_REQUEST', 'BloodRequest', id);
+
+  return fulfilled;
+};
+
 export const BloodRequestService = {
   createRequest,
   getRequestById,
@@ -200,4 +246,5 @@ export const BloodRequestService = {
   cancelRequest,
   getMatches,
   acceptRequest,
+  fulfillRequest,
 };
