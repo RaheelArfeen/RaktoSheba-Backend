@@ -1002,6 +1002,70 @@ export const openApiSpec = {
         },
       },
     },
+    '/public/requests': {
+      get: {
+        tags: ['Public'],
+        summary: 'Public request board — filterable, sortable, paginated (no auth)',
+        description:
+          'Only public fields are returned (no requester account, coordinates or donor identity). PENDING requests are never listed.',
+        parameters: [
+          { name: 'bloodGroup', in: 'query', schema: { type: 'string', enum: bloodGroupEnum } },
+          { name: 'minUrgency', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 5 } },
+          { name: 'search', in: 'query', description: 'Matches hospital name or address', schema: { type: 'string' } },
+          { name: 'status', in: 'query', schema: { type: 'string', enum: ['open', 'matched', 'fulfilled', 'all'], default: 'open' } },
+          { name: 'sortBy', in: 'query', schema: { type: 'string', enum: ['urgency', 'createdAt'], default: 'urgency' } },
+          { name: 'sortOrder', in: 'query', schema: { type: 'string', enum: ['asc', 'desc'], default: 'desc' } },
+          { name: 'page', in: 'query', schema: { type: 'integer', minimum: 1, default: 1 } },
+          { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 50, default: 12 } },
+        ],
+        responses: {
+          '200': jsonResponse('Request board', {
+            ...Envelope(
+              [
+                {
+                  id: '6f1c2b9e-0000-0000-0000-000000000000',
+                  bloodGroup: 'O_NEGATIVE',
+                  unitsNeeded: 3,
+                  urgency: 5,
+                  status: 'VERIFIED',
+                  createdAt: '2026-09-01T10:00:00.000Z',
+                  hospital: { name: 'Dhaka Medical College Hospital', address: 'Bakshibazar, Dhaka' },
+                },
+              ],
+              'Request board retrieved successfully',
+            ),
+            meta: { page: 1, limit: 12, total: 1, totalPage: 1 },
+          }),
+          '400': errorResponse('Invalid filters', 'Invalid request board filters'),
+        },
+      },
+    },
+    '/public/requests/{id}': {
+      get: {
+        tags: ['Public'],
+        summary: 'Public detail for one verified request, with donation progress (no auth)',
+        parameters: [idParam('id', 'Blood request id')],
+        responses: {
+          '200': jsonResponse(
+            'Request',
+            Envelope(
+              {
+                id: '6f1c2b9e-0000-0000-0000-000000000000',
+                bloodGroup: 'O_NEGATIVE',
+                unitsNeeded: 3,
+                urgency: 5,
+                status: 'MATCHED',
+                createdAt: '2026-09-01T10:00:00.000Z',
+                hospital: { name: 'Dhaka Medical College Hospital', address: 'Bakshibazar, Dhaka' },
+                donation: { status: 'SCHEDULED', scheduledAt: '2026-09-01T10:20:00.000Z', completedAt: null },
+              },
+              'Blood request retrieved successfully',
+            ),
+          ),
+          '404': errorResponse('Not found or not yet verified', 'Blood request not found'),
+        },
+      },
+    },
     '/public/urgent-requests': {
       get: {
         tags: ['Public'],
