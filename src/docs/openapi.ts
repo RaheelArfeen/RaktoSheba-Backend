@@ -888,6 +888,34 @@ export const openApiSpec = {
         },
       },
     },
+    '/admin/analytics/timeseries': {
+      get: {
+        tags: ['Admin'],
+        summary: 'Daily request/donation counts, per-group totals and open requests by emergency level (Admin only)',
+        description: 'Days are bucketed in Asia/Dhaka time. Days with no activity are included as zeros.',
+        security: bearerAuth,
+        parameters: [{ name: 'days', in: 'query', schema: { type: 'integer', minimum: 7, maximum: 90, default: 30 } }],
+        responses: {
+          '200': jsonResponse(
+            'Time series',
+            Envelope(
+              {
+                days: 7,
+                since: '2026-09-23',
+                daily: [
+                  { date: '2026-09-23', requests: 2, donations: 1 },
+                  { date: '2026-09-24', requests: 0, donations: 0 },
+                ],
+                byBloodGroup: [{ bloodGroup: 'O_NEGATIVE', total: 4, open: 1 }],
+                openByEmergencyLevel: { critical: 2, severe: 1, urgent: 2, standard: 1 },
+              },
+              'Time-series analytics retrieved successfully',
+            ),
+          ),
+          '400': errorResponse('Invalid range', 'days must be a whole number between 7 and 90'),
+        },
+      },
+    },
     '/admin/audit-logs': {
       get: {
         tags: ['Admin'],

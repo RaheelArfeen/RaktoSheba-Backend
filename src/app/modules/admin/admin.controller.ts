@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { AdminService } from './admin.service';
+import { z } from 'zod';
+import AppError from '../../utils/AppError';
 import { AuditLogService } from '../auditLog/auditLog.service';
 
 const banUser = catchAsync(async (req: Request, res: Response) => {
@@ -44,6 +46,26 @@ const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const timeSeriesQuerySchema = z.object({
+  days: z.coerce.number().int().min(7).max(90).default(30),
+});
+
+const getTimeSeries = catchAsync(async (req: Request, res: Response) => {
+  const parsed = timeSeriesQuerySchema.safeParse(req.query);
+
+  if (!parsed.success) {
+    throw new AppError(400, 'days must be a whole number between 7 and 90');
+  }
+
+  const result = await AdminService.getTimeSeries(parsed.data.days);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Time-series analytics retrieved successfully',
+    data: result,
+  });
+});
+
 const listAuditLogs = catchAsync(async (req: Request, res: Response) => {
   const { logs, meta } = await AuditLogService.listLogs(req.query);
   sendResponse(res, {
@@ -60,5 +82,6 @@ export const AdminController = {
   unbanUser,
   verifyHospital,
   getAnalytics,
+  getTimeSeries,
   listAuditLogs,
 };
