@@ -194,6 +194,7 @@ export const openApiSpec = {
     { name: 'Notifications' },
     { name: 'Admin' },
     { name: 'Payments' },
+    { name: 'Public' },
   ],
   paths: {
     '/auth/register': {
@@ -937,6 +938,46 @@ export const openApiSpec = {
           '200': jsonResponse(
             'Payments',
             PaginatedEnvelope([{ ...paymentExample, user: userExample }], 'Payments retrieved successfully'),
+          ),
+        },
+      },
+    },
+    '/public/stats': {
+      get: {
+        tags: ['Public'],
+        summary: 'Aggregate platform stats for the public website (no auth)',
+        responses: {
+          '200': jsonResponse(
+            'Stats',
+            Envelope(
+              { totalDonors: 120, availableDonors: 85, verifiedHospitals: 12, completedDonations: 340, openRequests: 7 },
+              'Platform stats retrieved successfully',
+            ),
+          ),
+        },
+      },
+    },
+    '/public/urgent-requests': {
+      get: {
+        tags: ['Public'],
+        summary: 'Open verified requests, most urgent first — public fields only (no auth)',
+        parameters: [{ name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 20, default: 6 } }],
+        responses: {
+          '200': jsonResponse(
+            'Urgent requests',
+            Envelope(
+              [
+                {
+                  id: '6f1c2b9e-0000-0000-0000-000000000000',
+                  bloodGroup: 'O_NEGATIVE',
+                  unitsNeeded: 2,
+                  urgency: 3,
+                  createdAt: '2026-09-01T10:00:00.000Z',
+                  hospital: { name: 'Dhaka Medical College Hospital', address: 'Bakshibazar, Dhaka' },
+                },
+              ],
+              'Urgent requests retrieved successfully',
+            ),
           ),
         },
       },

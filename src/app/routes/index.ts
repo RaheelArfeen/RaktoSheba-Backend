@@ -7,6 +7,7 @@ import { HospitalRoutes } from '../modules/hospital/hospital.route';
 import { AdminRoutes } from '../modules/admin/admin.route';
 import { UserRoutes } from '../modules/user/user.route';
 import { PaymentRoutes } from '../modules/payment/payment.route';
+import { PublicRoutes } from '../modules/public/public.route';
 
 const router = express.Router();
 
@@ -42,6 +43,10 @@ const moduleRoutes = [
   {
     path: '/payments',
     route: PaymentRoutes,
+  },
+  {
+    path: '/public',
+    route: PublicRoutes,
   },
 ];
 
