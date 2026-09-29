@@ -117,6 +117,17 @@ const bloodRequestExample = {
   deletedAt: null,
 };
 
+const requesterExample = {
+  id: 'e6a1a7d2-1b2a-4c3d-9e5f-1a2b3c4d5e6f',
+  email: 'dmch@raktosheba.com',
+  hospital: {
+    id: '0b6f3c1e-2d4a-4b8e-9f1a-3c5d7e9f1a2b',
+    name: 'Dhaka Medical College Hospital',
+    address: 'Bakshibazar, Dhaka',
+    verified: true,
+  },
+};
+
 const donationExample = {
   id: '69993a44-6cba-4c8a-a686-34bdeed33d0a',
   donorId: '2329d5ee-87d3-4eac-9238-564d7f457d85',
@@ -667,7 +678,10 @@ export const openApiSpec = {
         responses: {
           '200': jsonResponse(
             'Requests',
-            PaginatedEnvelope([bloodRequestExample], 'Blood requests retrieved successfully'),
+            PaginatedEnvelope(
+              [{ ...bloodRequestExample, requester: requesterExample, donation: null }],
+              'Blood requests retrieved successfully',
+            ),
           ),
         },
       },
@@ -682,7 +696,15 @@ export const openApiSpec = {
           '200': jsonResponse(
             'Request',
             Envelope(
-              { ...bloodRequestExample, donation: null },
+              {
+                ...bloodRequestExample,
+                status: 'MATCHED',
+                requester: requesterExample,
+                donation: {
+                  ...donationExample,
+                  donor: { id: donationExample.donorId, bloodGroup: 'O_NEGATIVE', photoUrl: null, user: { email: 'donor@raktosheba.com' } },
+                },
+              },
               'Blood request retrieved successfully',
             ),
           ),

@@ -23,6 +23,15 @@ type TListRequestFilters = TPaginationParams & {
   sortOrder?: 'asc' | 'desc';
 };
 
+// Public-facing requester details: the hospital, never the account's credentials.
+const requesterSelect = {
+  select: {
+    id: true,
+    email: true,
+    hospital: { select: { id: true, name: true, address: true, verified: true } },
+  },
+} satisfies Prisma.UserDefaultArgs;
+
 const createRequest = async (requesterId: string, payload: TCreateBloodRequestPayload) => {
   return prisma.bloodRequest.create({
     data: {
@@ -39,7 +48,14 @@ const createRequest = async (requesterId: string, payload: TCreateBloodRequestPa
 const getRequestById = async (id: string) => {
   const request = await prisma.bloodRequest.findFirst({
     where: { id, deletedAt: null },
-    include: { donation: true },
+    include: {
+      requester: requesterSelect,
+      donation: {
+        include: {
+          donor: { select: { id: true, bloodGroup: true, photoUrl: true, user: { select: { email: true } } } },
+        },
+      },
+    },
   });
 
   if (!request) {
@@ -66,6 +82,7 @@ const listRequests = async (filters: TListRequestFilters) => {
       skip,
       take: limit,
       orderBy: { [sortBy]: sortOrder },
+      include: { requester: requesterSelect, donation: true },
     }),
     prisma.bloodRequest.count({ where }),
   ]);
