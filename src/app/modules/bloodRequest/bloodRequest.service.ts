@@ -1,4 +1,4 @@
-import { BloodGroup, DonationStatus, Prisma, RequestStatus } from '@prisma/client';
+import { BloodGroup, DonationStatus, Prisma, RequestStatus, Role } from '@prisma/client';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
 import { isEligibleByLastDonation } from '../donor/donor.constant';
@@ -15,6 +15,8 @@ type TCreateBloodRequestPayload = {
   lat?: number;
   lng?: number;
 };
+
+type TViewer = { userId: string; role: Role };
 
 type TListRequestFilters = TPaginationParams & {
   status?: RequestStatus;
@@ -65,15 +67,24 @@ const getRequestById = async (id: string) => {
   return request;
 };
 
-const listRequests = async (filters: TListRequestFilters) => {
+// Hospitals only ever see their own requests; donors never see requests an admin
+// has not verified yet (those have not been announced to donors).
+const scopeForViewer = (viewer: TViewer): Prisma.BloodRequestWhereInput => {
+  if (viewer.role === Role.HOSPITAL) return { requesterId: viewer.userId };
+  if (viewer.role === Role.DONOR) return { status: { not: RequestStatus.PENDING } };
+  return {};
+};
+
+const listRequests = async (viewer: TViewer, filters: TListRequestFilters) => {
   const { page, limit, skip } = parsePagination(filters);
   const sortBy = filters.sortBy ?? 'createdAt';
   const sortOrder = filters.sortOrder ?? 'desc';
 
   const where: Prisma.BloodRequestWhereInput = {
-    deletedAt: null,
-    status: filters.status,
-    bloodGroup: filters.bloodGroup,
+    AND: [
+      scopeForViewer(viewer),
+      { deletedAt: null, status: filters.status, bloodGroup: filters.bloodGroup },
+    ],
   };
 
   const [requests, total] = await Promise.all([

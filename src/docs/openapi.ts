@@ -666,6 +666,8 @@ export const openApiSpec = {
       get: {
         tags: ['Blood Requests'],
         summary: 'List blood requests — paginated, filterable, sortable',
+        description:
+          'Scoped by role: Hospitals see only their own requests, Donors see only requests an Admin has verified (never PENDING), Admins see everything.',
         security: bearerAuth,
         parameters: [
           { name: 'status', in: 'query', schema: { type: 'string', enum: ['PENDING', 'VERIFIED', 'MATCHED', 'FULFILLED', 'CANCELLED'] } },

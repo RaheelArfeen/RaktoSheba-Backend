@@ -26,7 +26,7 @@ const getRequestById = catchAsync(async (req: Request, res: Response) => {
 
 const listRequests = catchAsync(async (req: Request, res: Response) => {
   const { status, bloodGroup, page, limit, sortBy, sortOrder } = req.query;
-  const { requests, meta } = await BloodRequestService.listRequests({
+  const { requests, meta } = await BloodRequestService.listRequests(req.user!, {
     status: status as RequestStatus | undefined,
     bloodGroup: bloodGroup as BloodGroup | undefined,
     page: page as string | undefined,
