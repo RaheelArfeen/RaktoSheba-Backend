@@ -11,6 +11,9 @@ import { openApiSpec } from './docs/openapi';
 
 const app: Application = express();
 
+// On Vercel the app sits behind one proxy hop; trust it so req.ip is the real caller.
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(
   cors({
@@ -29,17 +32,22 @@ app.post(
 
 app.use(express.json());
 
+// The website loads data from its own server, so many visitors can share one IP.
+// Reads are cheap and safe, so only changes (POST/PATCH/DELETE) count toward this limit.
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
+  skip: (req) => req.method === 'GET' || req.method === 'HEAD',
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later', errors: [] },
 });
 
+// Only failed sign-ins count, so password guessing is blocked without locking out real users.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
