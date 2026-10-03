@@ -6,7 +6,8 @@ const registerValidationSchema = z.object({
     password: z
       .string({ required_error: 'Password is required' })
       .min(6, 'Password must be at least 6 characters long'),
-    role: z.enum(['ADMIN', 'HOSPITAL', 'DONOR']).optional(),
+    // Admins are created by the seed or by another admin, never by public signup.
+    role: z.enum(['HOSPITAL', 'DONOR']).optional(),
   }),
 });
 

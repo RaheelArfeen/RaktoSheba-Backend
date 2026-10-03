@@ -222,7 +222,7 @@ export const openApiSpec = {
                 properties: {
                   email: { type: 'string', example: 'donor1@example.com' },
                   password: { type: 'string', example: 'secret123' },
-                  role: { type: 'string', enum: ['ADMIN', 'HOSPITAL', 'DONOR'], example: 'DONOR' },
+                  role: { type: 'string', enum: ['HOSPITAL', 'DONOR'], example: 'DONOR' },
                 },
               },
             },
