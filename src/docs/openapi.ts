@@ -314,12 +314,21 @@ export const openApiSpec = {
     '/auth/google/callback': {
       get: {
         tags: ['Auth'],
-        summary: 'Google OAuth callback (called by Google, not directly)',
+        summary: 'Google OAuth callback (called by Google). Redirects to CLIENT_URL/auth/google/callback?token=<2-minute pass>',
+        responses: { '302': { description: 'Redirect back to the website with a one-time pass, or to /auth/login?error=… on failure' } },
+      },
+    },
+    '/auth/google/exchange': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Swap the one-time Google pass for access and refresh tokens',
+        requestBody: {
+          required: true,
+          content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string' } } } } },
+        },
         responses: {
-          '200': jsonResponse(
-            'Logged in with Google',
-            Envelope(authTokensExample, 'Logged in with Google successfully'),
-          ),
+          '200': jsonResponse('Logged in with Google', Envelope({ ...authTokensExample, isNew: true }, 'Logged in with Google successfully')),
+          '401': errorResponse('Expired or invalid pass', 'This Google sign-in link has expired. Please try again.'),
         },
       },
     },

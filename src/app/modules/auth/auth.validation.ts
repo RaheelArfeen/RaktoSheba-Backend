@@ -24,7 +24,14 @@ const refreshTokenValidationSchema = z.object({
   }),
 });
 
+const googleExchangeValidationSchema = z.object({
+  body: z.object({
+    token: z.string({ required_error: 'token is required' }).min(10),
+  }),
+});
+
 export const AuthValidation = {
+  googleExchangeValidationSchema,
   registerValidationSchema,
   loginValidationSchema,
   refreshTokenValidationSchema,
