@@ -1,9 +1,10 @@
-import { BloodGroup, Prisma } from '@prisma/client';
+import { BloodGroup, Prisma, RequestStatus } from '@prisma/client';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
 import { isEligibleByLastDonation } from './donor.constant';
 import { parsePagination, TPaginationParams } from '../../utils/pagination';
 import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
+import { distanceInKm, isCompatibleDonor } from '../bloodRequest/bloodCompatibility';
 
 type TCreateDonorProfilePayload = {
   bloodGroup: BloodGroup;
@@ -160,7 +161,77 @@ const deleteMyProfile = async (userId: string) => {
   await prisma.donorProfile.update({ where: { userId }, data: { deletedAt: new Date() } });
 };
 
+const requireProfile = async (userId: string) => {
+  const profile = await prisma.donorProfile.findFirst({ where: { userId, deletedAt: null } });
+  if (!profile) {
+    throw new AppError(404, 'Donor profile not found');
+  }
+  return profile;
+};
+
+// Open, verified requests this donor's blood can safely go to: most urgent first, then nearest.
+const getMyMatches = async (userId: string) => {
+  const profile = await requireProfile(userId);
+  const recipientGroups = Object.values(BloodGroup).filter((group) => isCompatibleDonor(profile.bloodGroup, group));
+
+  const requests = await prisma.bloodRequest.findMany({
+    where: { deletedAt: null, status: RequestStatus.VERIFIED, bloodGroup: { in: recipientGroups } },
+    select: {
+      id: true,
+      bloodGroup: true,
+      unitsNeeded: true,
+      urgency: true,
+      status: true,
+      createdAt: true,
+      lat: true,
+      lng: true,
+      requester: { select: { hospital: { select: { name: true, address: true } } } },
+    },
+  });
+
+  return requests
+    .map(({ requester, lat, lng, ...request }) => ({
+      ...request,
+      hospital: requester.hospital,
+      distanceKm:
+        lat != null && lng != null && profile.lat != null && profile.lng != null
+          ? Math.round(distanceInKm(profile.lat, profile.lng, lat, lng) * 10) / 10
+          : null,
+    }))
+    .sort(
+      (a, b) =>
+        b.urgency - a.urgency ||
+        (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity) ||
+        b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+};
+
+// Every donation this donor has scheduled or completed, newest first.
+const getMyDonations = async (userId: string) => {
+  const profile = await requireProfile(userId);
+
+  return prisma.donation.findMany({
+    where: { donorId: profile.id },
+    orderBy: [{ scheduledAt: 'desc' }],
+    include: {
+      request: {
+        select: {
+          id: true,
+          bloodGroup: true,
+          unitsNeeded: true,
+          urgency: true,
+          status: true,
+          createdAt: true,
+          requester: { select: { hospital: { select: { name: true, address: true } } } },
+        },
+      },
+    },
+  });
+};
+
 export const DonorService = {
+  getMyMatches,
+  getMyDonations,
   createProfile,
   getMyProfile,
   getDonorById,

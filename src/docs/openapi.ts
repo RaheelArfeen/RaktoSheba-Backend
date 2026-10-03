@@ -467,6 +467,50 @@ export const openApiSpec = {
         },
       },
     },
+    '/donors/me/matches': {
+      get: {
+        tags: ['Donors'],
+        summary: 'Open verified requests this donor can safely give to — most urgent first, then nearest (Donor only)',
+        security: bearerAuth,
+        responses: {
+          '200': jsonResponse(
+            'Matches',
+            Envelope(
+              [
+                {
+                  id: '6f1c2b9e-0000-0000-0000-000000000000',
+                  bloodGroup: 'O_NEGATIVE',
+                  unitsNeeded: 3,
+                  urgency: 5,
+                  status: 'VERIFIED',
+                  createdAt: '2026-09-01T10:00:00.000Z',
+                  hospital: { name: 'Dhaka Medical College Hospital', address: 'Bakshibazar, Dhaka' },
+                  distanceKm: 9.5,
+                },
+              ],
+              'Matching requests retrieved successfully',
+            ),
+          ),
+          '404': errorResponse('No donor profile', 'Donor profile not found'),
+        },
+      },
+    },
+    '/donors/me/donations': {
+      get: {
+        tags: ['Donors'],
+        summary: "The donor's scheduled and completed donations, newest first (Donor only)",
+        security: bearerAuth,
+        responses: {
+          '200': jsonResponse(
+            'Donations',
+            Envelope(
+              [{ ...donationExample, request: { ...bloodRequestExample, requester: { hospital: requesterExample.hospital } } }],
+              'Donations retrieved successfully',
+            ),
+          ),
+        },
+      },
+    },
     '/donors/me/availability': {
       patch: {
         tags: ['Donors'],

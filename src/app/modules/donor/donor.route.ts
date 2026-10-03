@@ -17,6 +17,10 @@ router.post(
 
 router.get('/me', auth(Role.DONOR), DonorController.getMyProfile);
 
+router.get('/me/matches', auth(Role.DONOR), DonorController.getMyMatches);
+
+router.get('/me/donations', auth(Role.DONOR), DonorController.getMyDonations);
+
 router.patch(
   '/me',
   auth(Role.DONOR),

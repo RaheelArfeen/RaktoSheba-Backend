@@ -100,7 +100,29 @@ const deleteMyProfile = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getMyMatches = catchAsync(async (req: Request, res: Response) => {
+  const result = await DonorService.getMyMatches(req.user!.userId);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Matching requests retrieved successfully',
+    data: result,
+  });
+});
+
+const getMyDonations = catchAsync(async (req: Request, res: Response) => {
+  const result = await DonorService.getMyDonations(req.user!.userId);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Donations retrieved successfully',
+    data: result,
+  });
+});
+
 export const DonorController = {
+  getMyMatches,
+  getMyDonations,
   createProfile,
   getMyProfile,
   getDonorById,
