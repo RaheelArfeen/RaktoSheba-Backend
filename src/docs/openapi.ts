@@ -1091,6 +1091,7 @@ export const openApiSpec = {
           'Only public fields are returned (no requester account, coordinates or donor identity). PENDING requests are never listed.',
         parameters: [
           { name: 'bloodGroup', in: 'query', schema: { type: 'string', enum: bloodGroupEnum } },
+          { name: 'canHelp', in: 'query', description: "A donor's blood group; returns every request that group can safely give to", schema: { type: 'string', enum: bloodGroupEnum } },
           { name: 'minUrgency', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 5 } },
           { name: 'search', in: 'query', description: 'Matches hospital name or address', schema: { type: 'string' } },
           { name: 'status', in: 'query', schema: { type: 'string', enum: ['open', 'matched', 'fulfilled', 'all'], default: 'open' } },

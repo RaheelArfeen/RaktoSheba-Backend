@@ -14,6 +14,8 @@ const bloodGroupEnum = z.enum([
 // Query params arrive as strings, so numbers are coerced.
 const requestBoardQuerySchema = z.object({
   bloodGroup: bloodGroupEnum.optional(),
+  // A donor's own group: shows every request that group can safely give to.
+  canHelp: bloodGroupEnum.optional(),
   minUrgency: z.coerce.number().int().min(1).max(5).optional(),
   search: z.string().trim().min(1).max(100).optional(),
   status: z.enum(['open', 'matched', 'fulfilled', 'all']).default('open'),

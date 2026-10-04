@@ -1,6 +1,7 @@
-import { DonationStatus, Prisma, RequestStatus } from '@prisma/client';
+import { BloodGroup, DonationStatus, Prisma, RequestStatus } from '@prisma/client';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
+import { isCompatibleDonor } from '../bloodRequest/bloodCompatibility';
 import { TRequestBoardQuery } from './public.validation';
 
 // Aggregate counts only — safe to expose without authentication.
@@ -54,12 +55,16 @@ const getUrgentRequests = async (limit = 6) => {
   return requests.map(toPublicRequest);
 };
 
+// Every recipient group a donor of this group can safely give to.
+const recipientGroupsFor = (donor: BloodGroup) =>
+  Object.values(BloodGroup).filter((recipient) => isCompatibleDonor(donor, recipient));
+
 // Public request board: filter by group, minimum urgency, hospital name/address and status.
 const getRequestBoard = async (query: TRequestBoardQuery) => {
   const where: Prisma.BloodRequestWhereInput = {
     deletedAt: null,
     status: { in: boardStatuses[query.status] },
-    bloodGroup: query.bloodGroup,
+    bloodGroup: query.bloodGroup ?? (query.canHelp ? { in: recipientGroupsFor(query.canHelp) } : undefined),
     urgency: query.minUrgency ? { gte: query.minUrgency } : undefined,
     requester: query.search
       ? {
