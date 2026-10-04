@@ -185,6 +185,14 @@ const acceptRequest = async (requestId: string, donorUserId: string) => {
     throw new AppError(400, 'You are not yet eligible to donate (must wait 90 days between donations)');
   }
 
+  // One donation at a time: finish or withdraw the current one before taking another.
+  const upcoming = await prisma.donation.findFirst({
+    where: { donorId: donorProfile.id, status: DonationStatus.SCHEDULED, request: { status: RequestStatus.MATCHED } },
+  });
+  if (upcoming) {
+    throw new AppError(400, 'You already have an upcoming donation. Finish or withdraw it before accepting another.');
+  }
+
   const compatibleGroups = getCompatibleDonorGroups(request.bloodGroup);
 
   if (!compatibleGroups.includes(donorProfile.bloodGroup)) {
