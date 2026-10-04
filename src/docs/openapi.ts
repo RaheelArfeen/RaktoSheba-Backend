@@ -520,6 +520,17 @@ export const openApiSpec = {
         },
       },
     },
+    '/donors/me/donations/{id}/withdraw': {
+      patch: {
+        tags: ['Donors'],
+        summary: 'Withdraw from an upcoming donation; the request reopens for other donors (Donor only)',
+        security: bearerAuth,
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+        responses: {
+          '200': jsonResponse('Withdrawn', Envelope({ requestId: bloodRequestExample.id }, 'You have withdrawn from this request')),
+        },
+      },
+    },
     '/donors/me/availability': {
       patch: {
         tags: ['Donors'],

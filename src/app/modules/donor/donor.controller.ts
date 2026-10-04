@@ -120,7 +120,18 @@ const getMyDonations = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const withdrawDonation = catchAsync(async (req: Request, res: Response) => {
+  const result = await DonorService.withdrawDonation(req.user!.userId, req.params.id as string);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'You have withdrawn from this request',
+    data: result,
+  });
+});
+
 export const DonorController = {
+  withdrawDonation,
   getMyMatches,
   getMyDonations,
   createProfile,

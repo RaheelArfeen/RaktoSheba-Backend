@@ -1,10 +1,11 @@
-import { BloodGroup, Prisma, RequestStatus } from '@prisma/client';
+import { BloodGroup, DonationStatus, Prisma, RequestStatus } from '@prisma/client';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
 import { isEligibleByLastDonation } from './donor.constant';
 import { parsePagination, TPaginationParams } from '../../utils/pagination';
 import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
 import { distanceInKm, isCompatibleDonor } from '../bloodRequest/bloodCompatibility';
+import { AuditLogService } from '../auditLog/auditLog.service';
 
 type TCreateDonorProfilePayload = {
   bloodGroup: BloodGroup;
@@ -229,7 +230,34 @@ const getMyDonations = async (userId: string) => {
   });
 };
 
+// A donor who can no longer make it backs out: the match is removed and the request reopens for other donors.
+const withdrawDonation = async (userId: string, donationId: string) => {
+  const profile = await requireProfile(userId);
+  const donation = await prisma.donation.findFirst({
+    where: { id: donationId, donorId: profile.id },
+    include: { request: { select: { status: true } } },
+  });
+
+  if (!donation) {
+    throw new AppError(404, 'Donation not found');
+  }
+  if (donation.status !== DonationStatus.SCHEDULED || donation.request.status !== RequestStatus.MATCHED) {
+    throw new AppError(400, 'Only an upcoming donation can be withdrawn');
+  }
+
+  // The donation row is deleted (not just cancelled) because a request can hold only one donation.
+  await prisma.$transaction([
+    prisma.donation.delete({ where: { id: donation.id } }),
+    prisma.bloodRequest.update({ where: { id: donation.requestId }, data: { status: RequestStatus.VERIFIED } }),
+  ]);
+
+  await AuditLogService.log(userId, 'WITHDRAW_DONATION', 'BloodRequest', donation.requestId);
+
+  return { requestId: donation.requestId };
+};
+
 export const DonorService = {
+  withdrawDonation,
   getMyMatches,
   getMyDonations,
   createProfile,

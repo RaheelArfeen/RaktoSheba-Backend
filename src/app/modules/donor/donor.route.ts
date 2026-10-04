@@ -21,6 +21,8 @@ router.get('/me/matches', auth(Role.DONOR), DonorController.getMyMatches);
 
 router.get('/me/donations', auth(Role.DONOR), DonorController.getMyDonations);
 
+router.patch('/me/donations/:id/withdraw', auth(Role.DONOR), DonorController.withdrawDonation);
+
 router.patch(
   '/me',
   auth(Role.DONOR),
