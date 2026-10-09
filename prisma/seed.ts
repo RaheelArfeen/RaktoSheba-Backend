@@ -1,4 +1,12 @@
-import { PrismaClient, Role, BloodGroup, RequestStatus, DonationStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  Role,
+  BloodGroup,
+  RequestStatus,
+  DonationStatus,
+  HospitalType,
+  VerificationStatus,
+} from '@prisma/client';
 import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -30,12 +38,28 @@ async function main() {
 
   await prisma.hospital.upsert({
     where: { userId: hospitalUser.id },
-    update: {},
+    update: {
+      phone: '+880 1700 000001',
+      district: 'Dhaka',
+      openHours: '24/7',
+      description: 'The RaktoSheba flagship demo hospital with a round-the-clock transfusion centre.',
+      licenseNumber: 'DEMO-LIC-0001',
+    },
     create: {
       userId: hospitalUser.id,
       name: 'RaktoSheba Demo Hospital',
       address: '1 Demo Street, Dhaka',
-      verified: true,
+      type: HospitalType.PRIVATE,
+      verificationStatus: VerificationStatus.VERIFIED,
+      email: 'hospital@raktosheba.com',
+      phone: '+880 1700 000001',
+      emergencyPhone: '+880 1700 000009',
+      district: 'Dhaka',
+      upazila: 'Dhanmondi',
+      openHours: '24/7',
+      hasEmergencyService: true,
+      description: 'The RaktoSheba flagship demo hospital with a round-the-clock transfusion centre.',
+      licenseNumber: 'DEMO-LIC-0001',
     },
   });
 
@@ -73,9 +97,47 @@ async function main() {
 // website has realistic content. Idempotent: users are upserted, and requests
 // are only created for a hospital that has none yet.
 const SHOWCASE_HOSPITALS = [
-  { email: 'dmch@raktosheba.com', name: 'Dhaka Medical College Hospital', address: 'Bakshibazar, Dhaka', lat: 23.7257, lng: 90.3976 },
-  { email: 'square@raktosheba.com', name: 'Square Hospital', address: 'Panthapath, Dhaka', lat: 23.7527, lng: 90.3815 },
-  { email: 'ctg-medical@raktosheba.com', name: 'Chittagong Medical College Hospital', address: 'Panchlaish, Chattogram', lat: 22.3597, lng: 91.8317 },
+  {
+    email: 'dmch@raktosheba.com',
+    name: 'Dhaka Medical College Hospital',
+    address: 'Bakshibazar, Dhaka',
+    lat: 23.7257,
+    lng: 90.3976,
+    phone: '+880 1700 000002',
+    emergencyPhone: '+880 1700 000012',
+    district: 'Dhaka',
+    upazila: 'Lalbagh',
+    type: HospitalType.GOVERNMENT,
+    openHours: '24/7',
+    hasEmergencyService: true,
+  },
+  {
+    email: 'square@raktosheba.com',
+    name: 'Square Hospital',
+    address: 'Panthapath, Dhaka',
+    lat: 23.7527,
+    lng: 90.3815,
+    phone: '+880 1700 000003',
+    emergencyPhone: '+880 1700 000013',
+    district: 'Dhaka',
+    upazila: 'Tejgaon',
+    type: HospitalType.PRIVATE,
+    openHours: '24/7',
+    hasEmergencyService: true,
+  },
+  {
+    email: 'ctg-medical@raktosheba.com',
+    name: 'Chittagong Medical College Hospital',
+    address: 'Panchlaish, Chattogram',
+    lat: 22.3597,
+    lng: 91.8317,
+    phone: '+880 1700 000004',
+    district: 'Chattogram',
+    upazila: 'Panchlaish',
+    type: HospitalType.GOVERNMENT,
+    openHours: '24/7',
+    hasEmergencyService: false,
+  },
 ];
 
 const SHOWCASE_REQUESTS: { hospital: number; bloodGroup: BloodGroup; unitsNeeded: number; urgency: number }[] = [
@@ -103,8 +165,21 @@ async function seedShowcaseData(passwordHash: string) {
     });
     await prisma.hospital.upsert({
       where: { userId: user.id },
-      update: {},
-      create: { userId: user.id, name: h.name, address: h.address, verified: true },
+      update: { phone: h.phone, district: h.district, upazila: h.upazila, openHours: h.openHours },
+      create: {
+        userId: user.id,
+        name: h.name,
+        address: h.address,
+        type: h.type,
+        verificationStatus: VerificationStatus.VERIFIED,
+        email: h.email,
+        phone: h.phone,
+        emergencyPhone: h.emergencyPhone,
+        district: h.district,
+        upazila: h.upazila,
+        openHours: h.openHours,
+        hasEmergencyService: h.hasEmergencyService,
+      },
     });
     hospitalUsers.push({ user, ...h });
   }

@@ -50,6 +50,18 @@ enum PaymentStatus {
   FAILED
 }
 
+enum HospitalType {
+  GOVERNMENT
+  PRIVATE
+  CLINIC
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
@@ -89,15 +101,29 @@ model DonorProfile {
 }
 
 model Hospital {
-  id            String    @id @default(uuid())
-  userId        String    @unique
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name          String
-  address       String
-  verified      Boolean   @default(false)
-  licenseDocUrl String?
-  deletedAt     DateTime?
+  id                  String             @id @default(uuid())
+  userId              String             @unique
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  address             String
+  type                HospitalType?
+  email               String?
+  district            String?
+  upazila             String?
+  phone               String?
+  emergencyPhone      String?
+  website             String?
+  logoUrl             String?
+  openHours           String?
+  hasEmergencyService Boolean            @default(false)
+  description         String?
+  licenseNumber       String?
+  verificationStatus  VerificationStatus @default(PENDING)
+  licenseDocUrl       String?
+  deletedAt           DateTime?
 
+  @@index([district])
+  @@index([verificationStatus])
   @@index([deletedAt])
 }
 
