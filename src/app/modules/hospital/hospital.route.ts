@@ -31,6 +31,8 @@ router.post(
   HospitalController.uploadLicenseDocument,
 );
 
+router.post('/me/logo', auth(Role.HOSPITAL), upload.single('logo'), HospitalController.uploadLogo);
+
 router.get('/', auth(Role.ADMIN), HospitalController.listHospitals);
 
 export const HospitalRoutes = router;

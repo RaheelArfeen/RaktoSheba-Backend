@@ -48,13 +48,28 @@ const uploadLicenseDocument = catchAsync(async (req: Request, res: Response) => 
   });
 });
 
+const uploadLogo = catchAsync(async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new AppError(400, 'No logo file uploaded');
+  }
+
+  const result = await HospitalService.uploadLogo(req.user!.userId, req.file);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Logo uploaded successfully',
+    data: result,
+  });
+});
+
 const listHospitals = catchAsync(async (req: Request, res: Response) => {
-  const result = await HospitalService.listHospitals();
+  const { hospitals, meta } = await HospitalService.listHospitals(req.query);
   sendResponse(res, {
     statusCode: 200,
     success: true,
     message: 'Hospitals retrieved successfully',
-    data: result,
+    data: hospitals,
+    meta,
   });
 });
 
@@ -63,5 +78,6 @@ export const HospitalController = {
   getMyProfile,
   updateMyProfile,
   uploadLicenseDocument,
+  uploadLogo,
   listHospitals,
 };

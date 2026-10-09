@@ -1,4 +1,4 @@
-import { BloodGroup, DonationStatus, Prisma, RequestStatus } from '@prisma/client';
+import { BloodGroup, DonationStatus, Prisma, RequestStatus, VerificationStatus } from '@prisma/client';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
 import { isCompatibleDonor } from '../bloodRequest/bloodCompatibility';
@@ -10,7 +10,7 @@ const getStats = async () => {
     await Promise.all([
       prisma.donorProfile.count({ where: { deletedAt: null } }),
       prisma.donorProfile.count({ where: { deletedAt: null, isAvailable: true } }),
-      prisma.hospital.count({ where: { deletedAt: null, verified: true } }),
+      prisma.hospital.count({ where: { deletedAt: null, verificationStatus: VerificationStatus.VERIFIED } }),
       prisma.donation.count({ where: { status: DonationStatus.COMPLETED } }),
       prisma.bloodRequest.count({ where: { deletedAt: null, status: RequestStatus.VERIFIED } }),
     ]);
