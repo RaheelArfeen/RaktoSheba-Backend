@@ -4,10 +4,11 @@ import stripe from '../../../config/stripe';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
 import { parsePagination, TPaginationParams } from '../../utils/pagination';
+import { PaymentPurpose } from './payment.constant';
 
 type TInitiatePaymentPayload = {
   amount: number;
-  purpose: 'PLATFORM_DONATION' | 'EMERGENCY_FUND';
+  purpose: PaymentPurpose;
   requestId?: string;
 };
 
@@ -167,10 +168,12 @@ const listMyPayments = async (userId: string, query: TPaginationParams) => {
   return { payments, meta: { page, limit, total } };
 };
 
-const listAllPayments = async (query: TPaginationParams & { status?: PaymentStatus }) => {
+const listAllPayments = async (query: TPaginationParams & { status?: PaymentStatus; purpose?: PaymentPurpose }) => {
   const { page, limit, skip } = parsePagination(query);
 
-  const where = { status: query.status };
+  const where: { status?: PaymentStatus; purpose?: PaymentPurpose } = {};
+  if (query.status && Object.values(PaymentStatus).includes(query.status)) where.status = query.status;
+  if (query.purpose && Object.values(PaymentPurpose).includes(query.purpose)) where.purpose = query.purpose;
 
   const [payments, total] = await Promise.all([
     prisma.payment.findMany({
@@ -186,10 +189,41 @@ const listAllPayments = async (query: TPaginationParams & { status?: PaymentStat
   return { payments, meta: { page, limit, total } };
 };
 
+const getStats = async () => {
+  const [byStatus, byPurpose, paidTotal] = await Promise.all([
+    prisma.payment.groupBy({ by: ['status'], _count: { _all: true }, _sum: { amount: true } }),
+    prisma.payment.groupBy({
+      by: ['purpose'],
+      where: { status: PaymentStatus.PAID },
+      _count: { _all: true },
+      _sum: { amount: true },
+    }),
+    prisma.payment.aggregate({ where: { status: PaymentStatus.PAID }, _sum: { amount: true } }),
+  ]);
+
+  return {
+    totalCollected: Number(paidTotal._sum.amount ?? 0),
+    totalPayments: byStatus.reduce((sum, row) => sum + row._count._all, 0),
+    byStatus: Object.fromEntries(
+      Object.values(PaymentStatus).map((status) => {
+        const row = byStatus.find((r) => r.status === status);
+        return [status, { count: row?._count._all ?? 0, amount: Number(row?._sum.amount ?? 0) }];
+      }),
+    ),
+    byPurpose: Object.fromEntries(
+      Object.values(PaymentPurpose).map((purpose) => {
+        const row = byPurpose.find((r) => r.purpose === purpose);
+        return [purpose, { count: row?._count._all ?? 0, amount: Number(row?._sum.amount ?? 0) }];
+      }),
+    ),
+  };
+};
+
 export const PaymentService = {
   initiatePayment,
   handleWebhookEvent,
   getPaymentById,
   listMyPayments,
   listAllPayments,
+  getStats,
 };

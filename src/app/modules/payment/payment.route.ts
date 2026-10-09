@@ -16,6 +16,8 @@ router.post(
 
 router.get('/me', auth(), PaymentController.listMyPayments);
 
+router.get('/stats', auth(Role.ADMIN), PaymentController.getStats);
+
 router.get('/', auth(Role.ADMIN), PaymentController.listAllPayments);
 
 router.get('/success', PaymentController.paymentSuccessPage);

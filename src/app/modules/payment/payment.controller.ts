@@ -3,6 +3,7 @@ import { PaymentStatus } from '@prisma/client';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import AppError from '../../utils/AppError';
+import { PaymentPurpose } from './payment.constant';
 import { PaymentService } from './payment.service';
 
 const initiatePayment = catchAsync(async (req: Request, res: Response) => {
@@ -52,10 +53,11 @@ const listMyPayments = catchAsync(async (req: Request, res: Response) => {
 });
 
 const listAllPayments = catchAsync(async (req: Request, res: Response) => {
-  const { status, ...pagination } = req.query;
+  const { status, purpose, ...pagination } = req.query;
   const { payments, meta } = await PaymentService.listAllPayments({
     ...pagination,
     status: status as PaymentStatus | undefined,
+    purpose: purpose as PaymentPurpose | undefined,
   });
   sendResponse(res, {
     statusCode: 200,
@@ -63,6 +65,16 @@ const listAllPayments = catchAsync(async (req: Request, res: Response) => {
     message: 'Payments retrieved successfully',
     data: payments,
     meta,
+  });
+});
+
+const getStats = catchAsync(async (_req: Request, res: Response) => {
+  const result = await PaymentService.getStats();
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Payment stats retrieved successfully',
+    data: result,
   });
 });
 
@@ -90,6 +102,7 @@ export const PaymentController = {
   getPaymentById,
   listMyPayments,
   listAllPayments,
+  getStats,
   paymentSuccessPage,
   paymentCancelPage,
 };
