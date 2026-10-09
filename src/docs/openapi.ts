@@ -99,9 +99,38 @@ const hospitalExample = {
   userId: 'e6a1a7d2-1b2a-4c3d-9e5f-1a2b3c4d5e6f',
   name: 'City Medical Center',
   address: '123 Main St, Dhaka',
-  verified: false,
+  type: 'PRIVATE',
+  email: 'contact@citymedical.com',
+  district: 'Dhaka',
+  upazila: 'Dhanmondi',
+  phone: '+880 1700 000001',
+  emergencyPhone: '+880 1700 000009',
+  website: 'https://citymedical.com',
+  logoUrl: null,
+  openHours: '24/7',
+  hasEmergencyService: true,
+  description: null,
+  licenseNumber: 'HOSP-12345',
+  verificationStatus: 'PENDING',
   licenseDocUrl: null,
   deletedAt: null,
+};
+
+// Editable hospital details, shared by POST /hospitals and PATCH /hospitals/me.
+const hospitalBodyProperties = {
+  name: { type: 'string', example: 'City Medical Center' },
+  address: { type: 'string', example: '123 Main St, Dhaka' },
+  type: { type: 'string', enum: ['GOVERNMENT', 'PRIVATE', 'CLINIC'], example: 'PRIVATE' },
+  email: { type: 'string', format: 'email', example: 'contact@citymedical.com' },
+  district: { type: 'string', example: 'Dhaka' },
+  upazila: { type: 'string', example: 'Dhanmondi' },
+  phone: { type: 'string', example: '+880 1700 000001' },
+  emergencyPhone: { type: 'string', example: '+880 1700 000009' },
+  website: { type: 'string', example: 'https://citymedical.com' },
+  openHours: { type: 'string', example: '24/7' },
+  hasEmergencyService: { type: 'boolean', example: true },
+  description: { type: 'string' },
+  licenseNumber: { type: 'string', example: 'HOSP-12345' },
 };
 
 const bloodRequestExample = {
@@ -124,7 +153,7 @@ const requesterExample = {
     id: '0b6f3c1e-2d4a-4b8e-9f1a-3c5d7e9f1a2b',
     name: 'Dhaka Medical College Hospital',
     address: 'Bakshibazar, Dhaka',
-    verified: true,
+    verificationStatus: 'VERIFIED',
   },
 };
 
@@ -173,7 +202,7 @@ const auditLogExample = {
 
 const analyticsExample = {
   donors: { total: 12, available: 9 },
-  hospitals: { total: 3, verified: 2 },
+  hospitals: { total: 3, verified: 2, pending: 1 },
   requests: {
     total: 20,
     byStatus: { PENDING: 4, VERIFIED: 3, MATCHED: 5, FULFILLED: 6, CANCELLED: 2 },
@@ -608,10 +637,7 @@ export const openApiSpec = {
               schema: {
                 type: 'object',
                 required: ['name', 'address'],
-                properties: {
-                  name: { type: 'string', example: 'City Medical Center' },
-                  address: { type: 'string', example: '123 Main St, Dhaka' },
-                },
+                properties: hospitalBodyProperties,
               },
             },
           },
@@ -626,12 +652,25 @@ export const openApiSpec = {
       },
       get: {
         tags: ['Hospitals'],
-        summary: 'List all hospitals (Admin only)',
+        summary: 'List all hospitals — paginated, filterable by verification status (Admin only)',
         security: bearerAuth,
+        parameters: [
+          {
+            name: 'verificationStatus',
+            in: 'query',
+            schema: { type: 'string', enum: ['PENDING', 'VERIFIED', 'REJECTED'] },
+          },
+          { name: 'search', in: 'query', schema: { type: 'string' }, description: 'Matches name or address' },
+          pageParam,
+          limitParam,
+        ],
         responses: {
           '200': jsonResponse(
             'Hospitals',
-            Envelope([hospitalExample], 'Hospitals retrieved successfully'),
+            PaginatedEnvelope(
+              [{ ...hospitalExample, user: { id: hospitalExample.userId, email: 'contact@citymedical.com' } }],
+              'Hospitals retrieved successfully',
+            ),
           ),
         },
       },
@@ -651,13 +690,14 @@ export const openApiSpec = {
       patch: {
         tags: ['Hospitals'],
         summary: "Update the current hospital's own profile",
+        description: 'Partial update — send only the fields you want to change.',
         security: bearerAuth,
         requestBody: {
           content: {
             'application/json': {
               schema: {
                 type: 'object',
-                properties: { name: { type: 'string' }, address: { type: 'string' } },
+                properties: hospitalBodyProperties,
               },
             },
           },
@@ -667,6 +707,7 @@ export const openApiSpec = {
             'Updated',
             Envelope(hospitalExample, 'Hospital profile updated successfully'),
           ),
+          '404': errorResponse('Not found', 'Hospital profile not found'),
         },
       },
     },
@@ -694,6 +735,35 @@ export const openApiSpec = {
               'Document uploaded successfully',
             ),
           ),
+          '400': errorResponse('Bad file', 'Only JPEG, PNG, WEBP, or PDF files are allowed'),
+        },
+      },
+    },
+    '/hospitals/me/logo': {
+      post: {
+        tags: ['Hospitals'],
+        summary: 'Upload/replace the hospital’s logo (Cloudinary)',
+        security: bearerAuth,
+        requestBody: {
+          required: true,
+          content: {
+            'multipart/form-data': {
+              schema: {
+                type: 'object',
+                properties: { logo: { type: 'string', format: 'binary' } },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': jsonResponse(
+            'Uploaded',
+            Envelope(
+              { ...hospitalExample, logoUrl: 'https://res.cloudinary.com/.../hospital-logos/xyz.png' },
+              'Logo uploaded successfully',
+            ),
+          ),
+          '400': errorResponse('Bad file', 'Only JPEG, PNG, WEBP, or PDF files are allowed'),
         },
       },
     },
@@ -933,9 +1003,26 @@ export const openApiSpec = {
         responses: {
           '200': jsonResponse(
             'Verified',
-            Envelope({ ...hospitalExample, verified: true }, 'Hospital verified successfully'),
+            Envelope({ ...hospitalExample, verificationStatus: 'VERIFIED' }, 'Hospital verified successfully'),
           ),
           '400': errorResponse('Already verified', 'This hospital is already verified'),
+          '404': errorResponse('Not found', 'Hospital not found'),
+        },
+      },
+    },
+    '/admin/hospitals/{id}/reject': {
+      patch: {
+        tags: ['Admin'],
+        summary: 'Reject a hospital’s verification (Admin only) — audit logged',
+        security: bearerAuth,
+        parameters: [idParam('id', 'Hospital id')],
+        responses: {
+          '200': jsonResponse(
+            'Rejected',
+            Envelope({ ...hospitalExample, verificationStatus: 'REJECTED' }, 'Hospital rejected successfully'),
+          ),
+          '400': errorResponse('Already rejected', 'This hospital has already been rejected'),
+          '404': errorResponse('Not found', 'Hospital not found'),
         },
       },
     },
