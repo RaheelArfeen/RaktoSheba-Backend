@@ -6,6 +6,7 @@ import {
   DonationStatus,
   HospitalType,
   VerificationStatus,
+  PaymentStatus,
 } from '@prisma/client';
 import bcrypt from 'bcrypt';
 
@@ -87,6 +88,7 @@ async function main() {
 
   const showcaseDonors = await seedShowcaseData(passwordHash);
   await seedDemoHospitalHistory(hospitalUser.id, showcaseDonors);
+  await seedSamplePayments([donorUser.id, hospitalUser.id]);
 
   console.log('Seed complete. Demo accounts (password for all: %s):', DEMO_PASSWORD);
   console.log('  Admin    -', admin.email);
@@ -320,3 +322,28 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
+// A few Stripe test-mode style payments so the admin payments page and totals aren't empty.
+// Only added while the payments table is empty, so real test payments are never mixed in.
+async function seedSamplePayments(userIds: string[]) {
+  if ((await prisma.payment.count()) > 0) return;
+
+  const samples = [
+    { amount: 50, purpose: 'EMERGENCY_FUND', status: PaymentStatus.PAID, days: 2 },
+    { amount: 25, purpose: 'EMERGENCY_FUND', status: PaymentStatus.PAID, days: 6 },
+    { amount: 10, purpose: 'PLATFORM_DONATION', status: PaymentStatus.PAID, days: 12 },
+    { amount: 100, purpose: 'EMERGENCY_FUND', status: PaymentStatus.PENDING, days: 0 },
+    { amount: 20, purpose: 'PLATFORM_DONATION', status: PaymentStatus.FAILED, days: 15 },
+  ];
+  for (const [i, p] of samples.entries()) {
+    await prisma.payment.create({
+      data: {
+        userId: userIds[i % userIds.length],
+        amount: p.amount,
+        purpose: p.purpose,
+        status: p.status,
+        createdAt: daysAgo(p.days),
+      },
+    });
+  }
+}
