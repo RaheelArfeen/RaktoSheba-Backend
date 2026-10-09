@@ -21,6 +21,8 @@ type TViewer = { userId: string; role: Role };
 type TListRequestFilters = TPaginationParams & {
   status?: RequestStatus;
   bloodGroup?: BloodGroup;
+  minUrgency?: number;
+  search?: string;
   sortBy?: 'createdAt' | 'urgency';
   sortOrder?: 'asc' | 'desc';
 };
@@ -30,7 +32,7 @@ const requesterSelect = {
   select: {
     id: true,
     email: true,
-    hospital: { select: { id: true, name: true, address: true, verified: true } },
+    hospital: { select: { id: true, name: true, address: true, verificationStatus: true } },
   },
 } satisfies Prisma.UserDefaultArgs;
 
@@ -83,7 +85,27 @@ const listRequests = async (viewer: TViewer, filters: TListRequestFilters) => {
   const where: Prisma.BloodRequestWhereInput = {
     AND: [
       scopeForViewer(viewer),
-      { deletedAt: null, status: filters.status, bloodGroup: filters.bloodGroup },
+      {
+        deletedAt: null,
+        status: filters.status,
+        bloodGroup: filters.bloodGroup,
+        urgency: filters.minUrgency ? { gte: filters.minUrgency } : undefined,
+        ...(filters.search
+          ? {
+              requester: {
+                hospital: {
+                  is: {
+                    deletedAt: null,
+                    OR: [
+                      { name: { contains: filters.search, mode: 'insensitive' } },
+                      { address: { contains: filters.search, mode: 'insensitive' } },
+                    ],
+                  },
+                },
+              },
+            }
+          : {}),
+      },
     ],
   };
 
@@ -98,7 +120,34 @@ const listRequests = async (viewer: TViewer, filters: TListRequestFilters) => {
     prisma.bloodRequest.count({ where }),
   ]);
 
-  return { requests, meta: { page, limit, total } };
+  return { requests, meta: { page, limit, total, totalPage: Math.ceil(total / limit) || 1 } };
+};
+
+// Counts and totals that back the hospital dashboard overview.
+const getMyStats = async (hospitalUserId: string) => {
+  const scope: Prisma.BloodRequestWhereInput = { requesterId: hospitalUserId, deletedAt: null };
+
+  const [byStatusRows, openUnits, donationsCompleted] = await Promise.all([
+    prisma.bloodRequest.groupBy({ by: ['status'], where: scope, _count: { _all: true } }),
+    prisma.bloodRequest.aggregate({
+      where: { ...scope, status: RequestStatus.VERIFIED },
+      _sum: { unitsNeeded: true },
+    }),
+    prisma.donation.count({
+      where: { status: DonationStatus.COMPLETED, request: { requesterId: hospitalUserId, deletedAt: null } },
+    }),
+  ]);
+
+  const byStatus = Object.fromEntries(
+    Object.values(RequestStatus).map((status) => [
+      status,
+      byStatusRows.find((row) => row.status === status)?._count._all ?? 0,
+    ]),
+  ) as Record<RequestStatus, number>;
+
+  const total = Object.values(byStatus).reduce((sum, count) => sum + count, 0);
+
+  return { total, byStatus, openUnits: openUnits._sum.unitsNeeded ?? 0, donationsCompleted };
 };
 
 const verifyRequest = async (actorId: string, id: string) => {
@@ -278,6 +327,7 @@ export const BloodRequestService = {
   createRequest,
   getRequestById,
   listRequests,
+  getMyStats,
   verifyRequest,
   cancelRequest,
   getMatches,

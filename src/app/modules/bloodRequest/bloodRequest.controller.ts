@@ -25,10 +25,16 @@ const getRequestById = catchAsync(async (req: Request, res: Response) => {
 });
 
 const listRequests = catchAsync(async (req: Request, res: Response) => {
-  const { status, bloodGroup, page, limit, sortBy, sortOrder } = req.query;
+  const { status, bloodGroup, minUrgency, search, page, limit, sortBy, sortOrder } = req.query;
+  const parsedMinUrgency = Number(minUrgency);
   const { requests, meta } = await BloodRequestService.listRequests(req.user!, {
     status: status as RequestStatus | undefined,
     bloodGroup: bloodGroup as BloodGroup | undefined,
+    minUrgency:
+      Number.isInteger(parsedMinUrgency) && parsedMinUrgency >= 1 && parsedMinUrgency <= 5
+        ? parsedMinUrgency
+        : undefined,
+    search: typeof search === 'string' ? search.slice(0, 100) : undefined,
     page: page as string | undefined,
     limit: limit as string | undefined,
     sortBy: sortBy as 'createdAt' | 'urgency' | undefined,
@@ -40,6 +46,16 @@ const listRequests = catchAsync(async (req: Request, res: Response) => {
     message: 'Blood requests retrieved successfully',
     data: requests,
     meta,
+  });
+});
+
+const getMyStats = catchAsync(async (req: Request, res: Response) => {
+  const result = await BloodRequestService.getMyStats(req.user!.userId);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Hospital request stats retrieved successfully',
+    data: result,
   });
 });
 
@@ -104,6 +120,7 @@ export const BloodRequestController = {
   createRequest,
   getRequestById,
   listRequests,
+  getMyStats,
   verifyRequest,
   cancelRequest,
   getMatches,

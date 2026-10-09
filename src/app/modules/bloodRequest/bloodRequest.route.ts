@@ -16,6 +16,8 @@ router.post(
 
 router.get('/', auth(), BloodRequestController.listRequests);
 
+router.get('/mine/stats', auth(Role.HOSPITAL), BloodRequestController.getMyStats);
+
 router.get('/:id', auth(), BloodRequestController.getRequestById);
 
 router.get('/:id/matches', auth(Role.ADMIN, Role.HOSPITAL), BloodRequestController.getMatches);
