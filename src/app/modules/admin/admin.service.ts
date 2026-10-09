@@ -1,6 +1,7 @@
-import { BloodGroup, DonationStatus, RequestStatus } from '@prisma/client';
+import { BloodGroup, DonationStatus, Prisma, RequestStatus, Role, VerificationStatus } from '@prisma/client';
 import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
+import { parsePagination, TPaginationParams } from '../../utils/pagination';
 import { AuditLogService } from '../auditLog/auditLog.service';
 
 const setUserBanStatus = async (actorId: string, userId: string, isBanned: boolean) => {
@@ -21,26 +22,50 @@ const setUserBanStatus = async (actorId: string, userId: string, isBanned: boole
   return updated;
 };
 
-const verifyHospital = async (actorId: string, hospitalId: string) => {
+const setHospitalVerification = async (
+  actorId: string,
+  hospitalId: string,
+  verificationStatus: VerificationStatus,
+  alreadyMessage: string,
+  action: string,
+) => {
   const hospital = await prisma.hospital.findUnique({ where: { id: hospitalId } });
 
   if (!hospital) {
     throw new AppError(404, 'Hospital not found');
   }
 
-  if (hospital.verified) {
-    throw new AppError(400, 'This hospital is already verified');
+  if (hospital.verificationStatus === verificationStatus) {
+    throw new AppError(400, alreadyMessage);
   }
 
   const updated = await prisma.hospital.update({
     where: { id: hospitalId },
-    data: { verified: true },
+    data: { verificationStatus },
   });
 
-  await AuditLogService.log(actorId, 'VERIFY_HOSPITAL', 'Hospital', hospitalId);
+  await AuditLogService.log(actorId, action, 'Hospital', hospitalId);
 
   return updated;
 };
+
+const verifyHospital = (actorId: string, hospitalId: string) =>
+  setHospitalVerification(
+    actorId,
+    hospitalId,
+    VerificationStatus.VERIFIED,
+    'This hospital is already verified',
+    'VERIFY_HOSPITAL',
+  );
+
+const rejectHospital = (actorId: string, hospitalId: string) =>
+  setHospitalVerification(
+    actorId,
+    hospitalId,
+    VerificationStatus.REJECTED,
+    'This hospital has already been rejected',
+    'REJECT_HOSPITAL',
+  );
 
 const getAnalytics = async () => {
   const [
@@ -48,6 +73,7 @@ const getAnalytics = async () => {
     availableDonors,
     totalHospitals,
     verifiedHospitals,
+    pendingHospitals,
     requestsByStatus,
     completedDonations,
     bannedUsers,
@@ -55,7 +81,8 @@ const getAnalytics = async () => {
     prisma.donorProfile.count({ where: { deletedAt: null } }),
     prisma.donorProfile.count({ where: { deletedAt: null, isAvailable: true } }),
     prisma.hospital.count({ where: { deletedAt: null } }),
-    prisma.hospital.count({ where: { deletedAt: null, verified: true } }),
+    prisma.hospital.count({ where: { deletedAt: null, verificationStatus: VerificationStatus.VERIFIED } }),
+    prisma.hospital.count({ where: { deletedAt: null, verificationStatus: VerificationStatus.PENDING } }),
     prisma.bloodRequest.groupBy({ by: ['status'], where: { deletedAt: null }, _count: { _all: true } }),
     prisma.donation.count({ where: { status: DonationStatus.COMPLETED } }),
     prisma.user.count({ where: { isBanned: true } }),
@@ -72,7 +99,7 @@ const getAnalytics = async () => {
 
   return {
     donors: { total: totalDonors, available: availableDonors },
-    hospitals: { total: totalHospitals, verified: verifiedHospitals },
+    hospitals: { total: totalHospitals, verified: verifiedHospitals, pending: pendingHospitals },
     requests: { total: totalRequests, byStatus: requestCounts },
     donationsCompleted: completedDonations,
     bannedUsers,
@@ -146,9 +173,59 @@ const getTimeSeries = async (days: number) => {
   return { days, since: dates[0], daily: [...daily.values()], byBloodGroup, openByEmergencyLevel };
 };
 
+const parseBool = (value: unknown) => {
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return undefined;
+};
+
+const listUsers = async (query: TPaginationParams & { isBanned?: unknown; role?: unknown; search?: unknown }) => {
+  const { page, limit, skip } = parsePagination(query);
+  const isBanned = parseBool(query.isBanned);
+  const role = Object.values(Role).includes(query.role as Role) ? (query.role as Role) : undefined;
+  const search =
+    typeof query.search === 'string' && query.search.trim() ? query.search.trim().slice(0, 100) : undefined;
+
+  const where: Prisma.UserWhereInput = {
+    ...(isBanned === undefined ? {} : { isBanned }),
+    ...(role ? { role } : {}),
+    ...(search
+      ? {
+          OR: [
+            { email: { contains: search, mode: 'insensitive' } },
+            { hospital: { name: { contains: search, mode: 'insensitive' } } },
+          ],
+        }
+      : {}),
+  };
+
+  const [users, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isVolunteer: true,
+        isBanned: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return { users, meta: { page, limit, total, totalPage: Math.ceil(total / limit) || 1 } };
+};
+
 export const AdminService = {
   setUserBanStatus,
   verifyHospital,
+  rejectHospital,
   getAnalytics,
   getTimeSeries,
+  listUsers,
 };

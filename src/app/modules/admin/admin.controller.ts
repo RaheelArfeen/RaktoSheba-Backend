@@ -36,6 +36,16 @@ const verifyHospital = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const rejectHospital = catchAsync(async (req: Request, res: Response) => {
+  const result = await AdminService.rejectHospital(req.user!.userId, req.params.id as string);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Hospital rejected successfully',
+    data: result,
+  });
+});
+
 const getAnalytics = catchAsync(async (req: Request, res: Response) => {
   const result = await AdminService.getAnalytics();
   sendResponse(res, {
@@ -77,11 +87,24 @@ const listAuditLogs = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const listUsers = catchAsync(async (req: Request, res: Response) => {
+  const { users, meta } = await AdminService.listUsers(req.query);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: 'Users retrieved successfully',
+    data: users,
+    meta,
+  });
+});
+
 export const AdminController = {
   banUser,
   unbanUser,
   verifyHospital,
+  rejectHospital,
   getAnalytics,
   getTimeSeries,
   listAuditLogs,
+  listUsers,
 };
