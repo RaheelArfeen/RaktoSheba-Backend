@@ -85,7 +85,8 @@ async function main() {
     },
   });
 
-  await seedShowcaseData(passwordHash);
+  const showcaseDonors = await seedShowcaseData(passwordHash);
+  await seedDemoHospitalHistory(hospitalUser.id, showcaseDonors);
 
   console.log('Seed complete. Demo accounts (password for all: %s):', DEMO_PASSWORD);
   console.log('  Admin    -', admin.email);
@@ -154,7 +155,7 @@ const SHOWCASE_DONOR_GROUPS: BloodGroup[] = [
   BloodGroup.A_NEGATIVE, BloodGroup.O_POSITIVE, BloodGroup.B_NEGATIVE, BloodGroup.O_NEGATIVE,
 ];
 
-async function seedShowcaseData(passwordHash: string) {
+async function seedShowcaseData(passwordHash: string): Promise<{ id: string; bloodGroup: BloodGroup }[]> {
   const hospitalUsers = [];
 
   for (const h of SHOWCASE_HOSPITALS) {
@@ -245,6 +246,70 @@ async function seedShowcaseData(passwordHash: string) {
       await prisma.donorProfile.update({ where: { id: donor.id }, data: { lastDonationAt: completedAt } });
     }
   }
+
+  return donorProfiles;
+}
+
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+// Gives the demo hospital requests in every state (and spreads them over the last month), so its
+// dashboard and the admin charts have something real to show. Runs once: skipped if the demo
+// hospital already has a fulfilled request.
+async function seedDemoHospitalHistory(hospitalUserId: string, donors: { id: string; bloodGroup: BloodGroup }[]) {
+  const done = await prisma.bloodRequest.count({
+    where: { requesterId: hospitalUserId, status: RequestStatus.FULFILLED },
+  });
+  if (done > 0 || donors.length < 8) return;
+
+  const base = { requesterId: hospitalUserId, lat: 23.7465, lng: 90.3760 };
+  const open: { bloodGroup: BloodGroup; unitsNeeded: number; urgency: number; status: RequestStatus; days: number }[] = [
+    { bloodGroup: BloodGroup.O_POSITIVE, unitsNeeded: 2, urgency: 5, status: RequestStatus.VERIFIED, days: 1 },
+    { bloodGroup: BloodGroup.A_NEGATIVE, unitsNeeded: 1, urgency: 3, status: RequestStatus.VERIFIED, days: 4 },
+    { bloodGroup: BloodGroup.AB_POSITIVE, unitsNeeded: 1, urgency: 2, status: RequestStatus.PENDING, days: 0 },
+    { bloodGroup: BloodGroup.B_POSITIVE, unitsNeeded: 2, urgency: 4, status: RequestStatus.CANCELLED, days: 18 },
+  ];
+  for (const r of open) {
+    const { days, ...data } = r;
+    await prisma.bloodRequest.create({ data: { ...base, ...data, createdAt: daysAgo(days) } });
+  }
+
+  // A donor on the way right now (donor 7 is B−, which B+ patients can receive).
+  await prisma.bloodRequest.create({
+    data: {
+      ...base,
+      bloodGroup: BloodGroup.B_POSITIVE,
+      unitsNeeded: 1,
+      urgency: 4,
+      status: RequestStatus.MATCHED,
+      createdAt: daysAgo(2),
+      donation: { create: { donorId: donors[6].id, scheduledAt: daysAgo(1), status: DonationStatus.SCHEDULED } },
+    },
+  });
+
+  // Past requests that were completed: donor 1 (A+) gave to an A+ patient, donor 8 (O−) to an O− patient.
+  for (const [i, days] of [9, 23].entries()) {
+    const completedAt = daysAgo(days);
+    await prisma.bloodRequest.create({
+      data: {
+        ...base,
+        bloodGroup: i === 0 ? BloodGroup.A_POSITIVE : BloodGroup.O_NEGATIVE,
+        unitsNeeded: 1,
+        urgency: i === 0 ? 5 : 3,
+        status: RequestStatus.FULFILLED,
+        createdAt: daysAgo(days + 1),
+        donation: {
+          create: {
+            donorId: i === 0 ? donors[0].id : donors[7].id,
+            scheduledAt: completedAt,
+            completedAt,
+            status: DonationStatus.COMPLETED,
+          },
+        },
+      },
+    });
+  }
+  await prisma.donorProfile.update({ where: { id: donors[0].id }, data: { lastDonationAt: daysAgo(9) } });
+  await prisma.donorProfile.update({ where: { id: donors[7].id }, data: { lastDonationAt: daysAgo(23) } });
 }
 
 main()
