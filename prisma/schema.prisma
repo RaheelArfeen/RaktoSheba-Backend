@@ -169,6 +169,12 @@ model Notification {
   requestId String?
   request   BloodRequest? @relation(fields: [requestId], references: [id])
   channel   String
+  /// What happened, e.g. REQUEST_MATCH, DONOR_ACCEPTED, REQUEST_FULFILLED.
+  type      String        @default("REQUEST_MATCH")
+  title     String        @default("")
+  message   String        @default("")
+  /// Where the bell sends the user when they click it.
+  link      String?
   sentAt    DateTime      @default(now())
   readAt    DateTime?
 
