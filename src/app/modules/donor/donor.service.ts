@@ -6,6 +6,7 @@ import { parsePagination, TPaginationParams } from '../../utils/pagination';
 import { uploadToCloudinary } from '../../utils/uploadToCloudinary';
 import { distanceInKm, isCompatibleDonor } from '../bloodRequest/bloodCompatibility';
 import { AuditLogService } from '../auditLog/auditLog.service';
+import { NotificationService, bloodLabel } from '../notification/notification.service';
 
 type TCreateDonorProfilePayload = {
   bloodGroup: BloodGroup;
@@ -235,7 +236,7 @@ const withdrawDonation = async (userId: string, donationId: string) => {
   const profile = await requireProfile(userId);
   const donation = await prisma.donation.findFirst({
     where: { id: donationId, donorId: profile.id },
-    include: { request: { select: { status: true } } },
+    include: { request: { select: { status: true, requesterId: true, bloodGroup: true } } },
   });
 
   if (!donation) {
@@ -252,6 +253,13 @@ const withdrawDonation = async (userId: string, donationId: string) => {
   ]);
 
   await AuditLogService.log(userId, 'WITHDRAW_DONATION', 'BloodRequest', donation.requestId);
+  await NotificationService.notify([donation.request.requesterId], {
+    type: 'DONOR_WITHDREW',
+    title: 'A donor withdrew',
+    message: `The donor for your ${bloodLabel(donation.request.bloodGroup)} request can't make it. The request is open again.`,
+    link: `/dashboard/hospital/requests/${donation.requestId}`,
+    requestId: donation.requestId,
+  });
 
   return { requestId: donation.requestId };
 };

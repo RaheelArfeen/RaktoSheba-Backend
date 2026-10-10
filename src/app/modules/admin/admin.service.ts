@@ -3,6 +3,7 @@ import prisma from '../../../config/prisma';
 import AppError from '../../utils/AppError';
 import { parsePagination, TPaginationParams } from '../../utils/pagination';
 import { AuditLogService } from '../auditLog/auditLog.service';
+import { NotificationService } from '../notification/notification.service';
 
 const setUserBanStatus = async (actorId: string, userId: string, isBanned: boolean) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -45,6 +46,15 @@ const setHospitalVerification = async (
   });
 
   await AuditLogService.log(actorId, action, 'Hospital', hospitalId);
+  const verified = verificationStatus === VerificationStatus.VERIFIED;
+  await NotificationService.notify([hospital.userId], {
+    type: verified ? 'HOSPITAL_VERIFIED' : 'HOSPITAL_REJECTED',
+    title: verified ? 'Your hospital is verified' : 'Verification not approved',
+    message: verified
+      ? 'Your requests now reach donors as soon as our team checks them.'
+      : 'We could not verify your hospital. Check your licence details and contact us.',
+    link: '/dashboard/hospital/profile',
+  });
 
   return updated;
 };

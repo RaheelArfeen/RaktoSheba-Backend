@@ -44,3 +44,18 @@ export const verifyGoogleExchangeToken = (token: string): TGoogleExchangePayload
   if (payload.purpose !== 'google-exchange') throw new Error('Wrong token purpose');
   return payload;
 };
+
+// Short-lived pass for opening a live notification socket. Like the Google pass, it has
+// its own signing key and can't be used as an access token.
+type TSocketPayload = { userId: string; purpose: 'socket' };
+
+const socketSecret = () => `${process.env.JWT_ACCESS_SECRET as string}:socket`;
+
+export const generateSocketToken = (userId: string): string =>
+  jwt.sign({ userId, purpose: 'socket' } satisfies TSocketPayload, socketSecret(), { expiresIn: '5m' });
+
+export const verifySocketToken = (token: string): TSocketPayload => {
+  const payload = jwt.verify(token, socketSecret()) as TSocketPayload;
+  if (payload.purpose !== 'socket') throw new Error('Wrong token purpose');
+  return payload;
+};

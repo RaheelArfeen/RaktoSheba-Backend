@@ -170,10 +170,13 @@ const notificationExample = {
   id: '7ed8b0fa-2ac9-4a69-afe8-e4fc9c0a10fe',
   userId: 'e6a1a7d2-1b2a-4c3d-9e5f-1a2b3c4d5e6f',
   requestId: 'a5546510-ba38-40c1-9378-802f13e88758',
-  channel: 'email',
+  channel: 'in_app',
+  type: 'REQUEST_MATCH',
+  title: 'O− blood needed',
+  message: 'Dhaka Medical College Hospital needs 2 unit(s). Your blood is a match.',
+  link: '/dashboard/donor?request=4f6c1f0e-1b8a-4f47-9a3d-9f0f2c6b1a11',
   sentAt: '2026-09-01T00:00:00.000Z',
   readAt: null,
-  request: bloodRequestExample,
 };
 
 const paymentExample = {
@@ -941,14 +944,31 @@ export const openApiSpec = {
     '/notifications/me': {
       get: {
         tags: ['Notifications'],
-        summary: "Get the current user's notifications",
+        summary: "The current user's 30 newest notifications and their unread count",
         security: bearerAuth,
         responses: {
           '200': jsonResponse(
             'Notifications',
-            Envelope([notificationExample], 'Notifications retrieved successfully'),
+            Envelope({ items: [notificationExample], unread: 1 }, 'Notifications retrieved successfully'),
           ),
         },
+      },
+    },
+    '/notifications/me/read-all': {
+      patch: {
+        tags: ['Notifications'],
+        summary: "Mark all of the current user's notifications as read",
+        security: bearerAuth,
+        responses: { '200': jsonResponse('Updated', Envelope({ updated: 3 }, 'All notifications marked as read')) },
+      },
+    },
+    '/notifications/socket-token': {
+      post: {
+        tags: ['Notifications'],
+        summary:
+          'Issue a 5-minute token for the live Socket.io connection. Connect with `io(API_BASE_URL, { auth: { token } })` and listen for `notification` events. Only available where the API runs as a long-lived server.',
+        security: bearerAuth,
+        responses: { '200': jsonResponse('Socket token', Envelope({ token: 'eyJhbGciOi...' }, 'Socket token issued')) },
       },
     },
     '/notifications/{id}/read': {

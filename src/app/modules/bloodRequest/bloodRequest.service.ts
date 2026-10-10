@@ -4,7 +4,7 @@ import AppError from '../../utils/AppError';
 import { isEligibleByLastDonation } from '../donor/donor.constant';
 import { getCompatibleDonorGroups } from './bloodCompatibility';
 import { findMatchingDonors } from './matching';
-import { NotificationService } from '../notification/notification.service';
+import { NotificationService, bloodLabel } from '../notification/notification.service';
 import { AuditLogService } from '../auditLog/auditLog.service';
 import { parsePagination, TPaginationParams } from '../../utils/pagination';
 
@@ -37,7 +37,7 @@ const requesterSelect = {
 } satisfies Prisma.UserDefaultArgs;
 
 const createRequest = async (requesterId: string, payload: TCreateBloodRequestPayload) => {
-  return prisma.bloodRequest.create({
+  const request = await prisma.bloodRequest.create({
     data: {
       requesterId,
       bloodGroup: payload.bloodGroup,
@@ -47,6 +47,10 @@ const createRequest = async (requesterId: string, payload: TCreateBloodRequestPa
       lng: payload.lng,
     },
   });
+
+  await NotificationService.notifyAdminsOfNewRequest(request);
+
+  return request;
 };
 
 const getRequestById = async (id: string) => {
@@ -168,6 +172,13 @@ const verifyRequest = async (actorId: string, id: string) => {
 
   await AuditLogService.log(actorId, 'VERIFY_REQUEST', 'BloodRequest', id);
   await NotificationService.fanOutForRequest(verifiedRequest);
+  await NotificationService.notify([verifiedRequest.requesterId], {
+    type: 'REQUEST_VERIFIED',
+    title: 'Request verified',
+    message: `Your ${bloodLabel(verifiedRequest.bloodGroup)} request is live. Compatible donors have been alerted.`,
+    link: `/dashboard/hospital/requests/${id}`,
+    requestId: id,
+  });
 
   return verifiedRequest;
 };
@@ -193,6 +204,21 @@ const cancelRequest = async (actorId: string, id: string, requesterId: string, i
   });
 
   await AuditLogService.log(actorId, 'CANCEL_REQUEST', 'BloodRequest', id);
+
+  // A donor who already said yes needs to know they don't have to go.
+  const donation = await prisma.donation.findUnique({
+    where: { requestId: id },
+    select: { donor: { select: { userId: true } } },
+  });
+  if (donation) {
+    await NotificationService.notify([donation.donor.userId], {
+      type: 'REQUEST_CANCELLED',
+      title: 'Request cancelled',
+      message: `The ${bloodLabel(request.bloodGroup)} request you accepted was cancelled. You don't need to go in.`,
+      link: '/dashboard/donor/donations',
+      requestId: id,
+    });
+  }
 
   return cancelled;
 };
@@ -267,6 +293,13 @@ const acceptRequest = async (requestId: string, donorUserId: string) => {
     });
 
     await AuditLogService.log(donorUserId, 'ACCEPT_REQUEST', 'BloodRequest', requestId);
+    await NotificationService.notify([request.requesterId], {
+      type: 'DONOR_ACCEPTED',
+      title: 'A donor is on the way',
+      message: `A donor with ${bloodLabel(donorProfile.bloodGroup)} blood accepted your ${bloodLabel(request.bloodGroup)} request.`,
+      link: `/dashboard/hospital/requests/${requestId}`,
+      requestId,
+    });
 
     return donation;
   } catch (error) {
@@ -319,6 +352,17 @@ const fulfillRequest = async (actorId: string, id: string, isAdmin: boolean) => 
   });
 
   await AuditLogService.log(actorId, 'FULFILL_REQUEST', 'BloodRequest', id);
+
+  const donor = await prisma.donorProfile.findUnique({ where: { id: donation.donorId }, select: { userId: true } });
+  if (donor) {
+    await NotificationService.notify([donor.userId], {
+      type: 'REQUEST_FULFILLED',
+      title: 'Thank you for donating',
+      message: 'The hospital confirmed your donation. You can give again in 90 days.',
+      link: '/dashboard/donor/donations',
+      requestId: id,
+    });
+  }
 
   return fulfilled;
 };
