@@ -7,6 +7,7 @@ import validateRequest from '../../middlewares/validateRequest';
 import { AuthValidation } from './auth.validation';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { clientUrl } from '../../../config/clientUrl';
 
 const router = express.Router();
 
@@ -27,7 +28,6 @@ router.post(
 router.post('/logout', auth(), AuthController.logout);
 
 // The website this API serves; Google sign-ins are sent back here.
-const clientUrl = () => (process.env.CLIENT_URL || process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:3000').replace(/\/$/, '');
 
 type TGoogleState = { role?: 'DONOR' | 'HOSPITAL'; next?: string };
 

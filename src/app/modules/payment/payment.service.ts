@@ -2,6 +2,7 @@ import { Payment, PaymentStatus, Role } from '@prisma/client';
 import Stripe from 'stripe';
 import stripe from '../../../config/stripe';
 import prisma from '../../../config/prisma';
+import { clientUrl } from '../../../config/clientUrl';
 import AppError from '../../utils/AppError';
 import { parsePagination, TPaginationParams } from '../../utils/pagination';
 import { PaymentPurpose } from './payment.constant';
@@ -16,7 +17,10 @@ type TInitiatePaymentPayload = {
 // pages. If those aren't configured, fall back to this API's own simple pages rather
 // than handing Stripe a broken "undefined?paymentId=..." URL.
 const redirectUrl = (envValue: string | undefined, fallbackPath: string, paymentId: string) => {
-  const base = envValue || `http://localhost:${process.env.PORT || 8000}/api/v1/payments/${fallbackPath}`;
+  // Default: the website's own /payment/success or /payment/cancel page.
+  const base = envValue && !(process.env.VERCEL && envValue.includes('localhost'))
+    ? envValue
+    : `${clientUrl()}/payment/${fallbackPath}`;
   const url = new URL(base);
   url.searchParams.set('paymentId', paymentId);
   return url.toString();
